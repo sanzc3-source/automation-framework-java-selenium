@@ -1,0 +1,9 @@
+# Maven build output
+target/
+
+# Cucumber/Test output
+test-output/
+
+# IntelliJ (optional - recommended)
+.idea/
+*.iml
