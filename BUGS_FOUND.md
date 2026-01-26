@@ -167,29 +167,157 @@ UI and API step definitions were implemented together in a single
 ---
 
 ### Issue 7 – Duplicate Cucumber Step Definitions
-
-Type: Automation / BDD Configuration
+**Type:** Automation / BDD Configuration  
 **Risk:** Medium
 
-**Evidence:**
-Cucumber failed at runtime with a DuplicateStepDefinitionException due to multiple step annotations (@Given and @When) mapped to the same step text:
-"I add these items to the cart {string}"
+**Evidence:**  
+Cucumber failed at runtime with a `DuplicateStepDefinitionException` due to
+multiple step annotations mapped to the same step text:
+- `"I add these items to the cart {string}"`
 
 **Impact:**
 - Entire UI test suite failed before execution
 - Blocked scenario execution and CI feedback
 - Produced misleading “undefined step” errors
-- Increased debugging time and reduced framework reliability
 
 **Fix:**
-- Standardized the step definition to use a single keyword (@When)
-- Updated all feature files to consistently use the same step wording
-- Removed redundant step annotations to enforce one-to-one step mapping
+- Standardized the step definition to a single annotation
+- Updated feature files to use consistent step wording
+- Removed redundant step annotations
 
 **Verification:**
-- mvn clean test executes successfully
-- All UI scenarios pass consistently
+- `mvn clean test` executes successfully
+- UI scenarios pass consistently
 - No duplicate or undefined step warnings
-- Step definitions are deterministic and easy to maintain
+
+---
+
+## API-Specific Findings & Stabilization Work
+
+---
+
+### Issue 8 – External API (ReqRes) Blocking Automated Requests
+**Type:** Test Stability / External Dependency  
+**Risk:** High
+
+**Evidence:**  
+All API tests failed with HTTP `403` responses. Responses returned HTML login
+pages instead of JSON payloads, indicating upstream request blocking.
+
+**Impact:**
+- All API tests failed consistently
+- API suite was non-deterministic
+- CI execution would be unreliable or completely blocked
+- Test failures were unrelated to application logic
+
+**Root Cause:**
+- ReqRes API introduced request filtering / protection (e.g., bot detection or rate limiting)
+- Automated test requests were rejected
+
+**Fix:**
+- Introduced **WireMock** to simulate ReqRes API behavior
+- Implemented `ApiMockHook` to:
+  - Start WireMock on a dynamic port before API scenarios
+  - Stub all required ReqRes endpoints
+  - Override `api.baseUrl` at runtime
+- Ensured API tests run against mocked responses only
+
+**Verification:**
+- API tests run consistently without external dependencies
+- All API scenarios pass locally and are CI-safe
+- No outbound network dependency required
+
+---
+
+### Issue 9 – Jackson Dependency Mismatch Causing Runtime Failures
+**Type:** Dependency Resolution  
+**Risk:** High
+
+**Evidence:**  
+API tests failed with:
+NoClassDefFoundError: com.fasterxml.jackson.annotation.JsonSerializeAs
+
+
+**Impact:**
+- WireMock server failed to start
+- Entire API test suite failed at runtime
+- Errors were non-obvious and misleading
+
+**Root Cause:**
+- Incorrect Jackson version specified (`2.21.0`)
+- Version did not exist in Maven Central
+- Dependency resolution pulled incompatible Jackson artifacts
+
+**Fix:**
+- Corrected Jackson dependency to a valid version (`2.21`)
+- Removed duplicate / conflicting Jackson declarations
+- Cleared local Maven cache to force clean resolution
+
+**Verification:**
+- WireMock starts successfully
+- API tests execute without Jackson-related errors
+
+---
+
+### Issue 10 – Cucumber DataTable Misuse in API Assertions
+**Type:** Test Implementation  
+**Risk:** Medium
+
+**Evidence:**  
+API assertions failed with:
+UndefinedDataTableTypeException
+ClassCastException: java.lang.String cannot be cast to char[]
+
+
+**Impact:**
+- API tests partially passed but failed during validation
+- Reduced confidence in API assertions
+
+**Root Cause:**
+- DataTables were incorrectly converted to `List<String>`
+- Table width required `Map<String, String>` semantics
+
+**Fix:**
+- Updated API step definitions to use `dataTable.asMap(String.class, String.class)`
+- Validated response payloads using key-based assertions
+
+**Verification:**
+- All API assertions pass correctly
+- Step definitions are clearer and more maintainable
+
+---
+
+### Issue 11 – Undefined Cucumber Steps Due to Over-Specific Step Text
+**Type:** BDD Design  
+**Risk:** Medium
+
+**Evidence:**  
+Cucumber reported undefined steps for:
+- `"I create a user with following Peter Manager"`
+- `"I create a user with following Liza Sales"`
+
+**Impact:**
+- Scenario Outline steps were not reusable
+- Required redundant step definitions
+
+**Fix:**
+- Replaced hard-coded step text with parameterized step:
+  - `I create a user with following {string} {string}`
+- Consolidated logic into a single reusable step definition
+
+**Verification:**
+- Scenario Outlines execute correctly
+- No undefined or duplicate steps
+- API tests are fully data-driven
+
+---
+
+## Final State Summary
+
+- UI and API tests pass consistently
+- External dependencies eliminated from API execution
+- Dependency graph cleaned and stabilized
+- Framework structure aligned with best practices
+- Project is CI-ready and deterministic
 
 ---

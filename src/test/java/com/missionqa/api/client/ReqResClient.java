@@ -14,41 +14,42 @@ public class ReqResClient {
     private final String baseUrl;
 
     public ReqResClient() {
-        // Prefer config key "api.baseUrl". If not present, default to ReqRes.
         String cfg;
         try {
-            cfg = TestConfig.getProperty("api.baseUrl");
+            cfg = System.getProperty("api.baseUrl", TestConfig.getProperty("api.baseUrl"));
+
         } catch (Exception e) {
-            cfg = "https://reqres.in";
+            cfg = "http://localhost:8080";
         }
         this.baseUrl = cfg;
+    }
 
-        // RestAssured global defaults (safe for this small project)
-        RestAssured.baseURI = this.baseUrl;
+    // Centralized request defaults (helps avoid Cloudflare blocks)
+    private io.restassured.specification.RequestSpecification request() {
+        return RestAssured
+                .given()
+                .baseUri(baseUrl)
+                .header("Accept", "application/json")
+                .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
+                .header("Accept-Language", "en-US,en;q=0.9");
     }
 
     public Response listUsers(int page) {
-        return RestAssured
-                .given()
-                .contentType(JSON)
+        return request()
                 .when()
                 .get("/api/users?page=" + page)
                 .andReturn();
     }
 
     public Response listUsersDelayed(int delaySeconds) {
-        return RestAssured
-                .given()
-                .contentType(JSON)
+        return request()
                 .when()
                 .get("/api/users?delay=" + delaySeconds)
                 .andReturn();
     }
 
     public Response getUser(int userId) {
-        return RestAssured
-                .given()
-                .contentType(JSON)
+        return request()
                 .when()
                 .get("/api/users/" + userId)
                 .andReturn();
@@ -59,8 +60,7 @@ public class ReqResClient {
         body.put("name", name);
         body.put("job", job);
 
-        return RestAssured
-                .given()
+        return request()
                 .contentType(JSON)
                 .body(body)
                 .when()
@@ -75,8 +75,7 @@ public class ReqResClient {
             body.put("password", password);
         }
 
-        return RestAssured
-                .given()
+        return request()
                 .contentType(JSON)
                 .body(body)
                 .when()

@@ -7,12 +7,9 @@ import io.cucumber.java.en.Given;
 import io.cucumber.java.en.When;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.And;
-import io.cucumber.java.Scenario;
-
 import io.restassured.response.Response;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static org.testng.Assert.*;
 
@@ -21,23 +18,29 @@ public class ApiSteps {
         private final ReqResClient client = new ReqResClient();
         private final TestContext ctx = new TestContext();
 
-        // Keys for context storage
         private static final String LAST_RESPONSE = "lastResponse";
         private static final String ALL_USER_IDS = "allUserIds";
+
+        // -------------------------
+        // LIST USERS
+        // -------------------------
 
         @Given("^I get the default list of users for on 1st page$")
         public void iGetTheDefaultListofusers() {
                 Response resp = client.listUsers(1);
                 ctx.set(LAST_RESPONSE, resp);
-                assertEquals(resp.getStatusCode(), 200, "Expected 200 for list users page 1");
+
+                assertEquals(
+                        resp.getStatusCode(),
+                        200,
+                        "Expected 200 for list users page 1. Body: " + resp.getBody().asString()
+                );
         }
 
         @When("I get the list of all users within every page")
         public void iGetTheListOfAllUsers() {
-                // ReqRes typically returns: { page, per_page, total, total_pages, data: [...] }
-                // We'll fetch all pages and collect user IDs.
                 Response first = client.listUsers(1);
-                assertEquals(first.getStatusCode(), 200, "Expected 200 for list users");
+                assertEquals(first.getStatusCode(), 200, "Expected 200 for list users. Body: " + first.getBody().asString());
 
                 Integer totalPages = first.jsonPath().getInt("total_pages");
                 if (totalPages == null || totalPages < 1) totalPages = 1;
@@ -46,12 +49,11 @@ public class ApiSteps {
 
                 for (int page = 1; page <= totalPages; page++) {
                         Response r = client.listUsers(page);
-                        assertEquals(r.getStatusCode(), 200, "Expected 200 for list users page " + page);
+                        assertEquals(r.getStatusCode(), 200, "Expected 200 for list users page " + page + ". Body: " + r.getBody().asString());
 
                         List<Integer> pageIds = r.jsonPath().getList("data.id");
                         if (pageIds != null) ids.addAll(pageIds);
 
-                        // keep last response handy for the next Then if needed
                         ctx.set(LAST_RESPONSE, r);
                 }
 
@@ -60,8 +62,6 @@ public class ApiSteps {
 
         @Then("I should see total users count equals the number of user ids")
         public void iShouldMatchTotalCount() {
-                // Compare "total" from API vs size of collected IDs
-                // We'll read total from the last response or re-fetch page 1 (safe).
                 Response r = (Response) ctx.get(LAST_RESPONSE);
                 if (r == null) r = client.listUsers(1);
 
@@ -71,12 +71,16 @@ public class ApiSteps {
                 @SuppressWarnings("unchecked")
                 Set<Integer> ids = (Set<Integer>) ctx.get(ALL_USER_IDS);
                 assertNotNull(ids, "User IDs were not collected. Did the When step run?");
+
                 assertEquals(ids.size(), total.intValue(), "Total users count should match unique user ids count");
         }
 
-        @Given("I make a search for user (.*)")
-        public void iMakeASearchForUser(String sUserID) {
-                int userId = Integer.parseInt(sUserID.trim());
+        // -------------------------
+        // SINGLE USER
+        // -------------------------
+
+        @Given("I make a search for user {int}")
+        public void iMakeASearchForUser(int userId) {
                 Response resp = client.getUser(userId);
                 ctx.set(LAST_RESPONSE, resp);
         }
@@ -85,30 +89,55 @@ public class ApiSteps {
         public void IShouldSeeFollowingUserData(DataTable dt) {
                 Response resp = (Response) ctx.get(LAST_RESPONSE);
                 assertNotNull(resp, "No response found in context");
-                assertEquals(resp.getStatusCode(), 200, "Expected 200 for single user");
 
-                Map<String, String> expected = dataTableToMap(dt);
+                assertEquals(
+                        resp.getStatusCode(),
+                        200,
+                        "Expected 200 for single user. Body: " + resp.getBody().asString()
+                );
 
-                // Example keys you might have in the feature table:
-                // id, email, first_name, last_name
+                // Feature format:
+                // | first_name | email |
+                // | Emma       | emma... |
+                Map<String, String> expected = singleRowTableToMap(dt);
+
                 expected.forEach((k, v) -> {
-                        String actual = String.valueOf(resp.jsonPath().get("data." + k));
+                        String actual = resp.jsonPath().getString("data." + k);
                         assertEquals(actual, v, "Mismatch for data." + k);
                 });
         }
 
-        @Then("I receive error code (.*) in response")
+        @Then("I receive error code {int} in response")
         public void iReceiveErrorCodeInResponse(int responseCode) {
                 Response resp = (Response) ctx.get(LAST_RESPONSE);
                 assertNotNull(resp, "No response found in context");
-                assertEquals(resp.getStatusCode(), responseCode, "Unexpected status code");
+
+                assertEquals(
+                        resp.getStatusCode(),
+                        responseCode,
+                        "Unexpected status code. Body: " + resp.getBody().asString()
+                );
         }
 
-        @Given("I create a user with following (.*) (.*)")
+        // -------------------------
+        // CREATE USER
+        // -------------------------
+
+        @Given("I create a user with following {word} {word}")
+        public void iCreateUserWithFollowingWords(String name, String job) {
+                iCreateUserWithFollowing(name, job);
+        }
+
+        @Given("I create a user with following {string} {string}")
         public void iCreateUserWithFollowing(String sUsername, String sJob) {
                 Response resp = client.createUser(sUsername, sJob);
                 ctx.set(LAST_RESPONSE, resp);
-                assertEquals(resp.getStatusCode(), 201, "Expected 201 for create user");
+
+                assertEquals(
+                        resp.getStatusCode(),
+                        201,
+                        "Expected 201 for create user. Body: " + resp.getBody().asString()
+                );
         }
 
         @Then("response should contain the following data")
@@ -116,45 +145,92 @@ public class ApiSteps {
                 Response resp = (Response) ctx.get(LAST_RESPONSE);
                 assertNotNull(resp, "No response found in context");
 
-                Map<String, String> expected = dataTableToMap(dt);
+                // Feature format is header-only:
+                // | name | job | id | createdAt |
+                List<String> fields = dt.row(0);
 
-                // This checks top-level fields in create user response (name, job, id, createdAt, etc.)
-                expected.forEach((k, v) -> {
-                        Object raw = resp.jsonPath().get(k);
-                        assertNotNull(raw, "Missing field: " + k);
-
-                        // If expected is "*", treat as "exists"
-                        if (!"*".equals(v)) {
-                                assertEquals(String.valueOf(raw), v, "Mismatch for field: " + k);
-                        }
-                });
+                for (String field : fields) {
+                        String key = field.trim();
+                        Object raw = resp.jsonPath().get(key);
+                        assertNotNull(raw, "Missing field in response: " + key + " Body: " + resp.getBody().asString());
+                }
         }
 
-        @Given("I login unsuccessfully with the following data")
-        public void iLoginSuccesfullyWithFollowingData(DataTable dt) {
-                Map<String, String> creds = dataTableToMap(dt);
+        // -------------------------
+        // LOGIN
+        // -------------------------
 
-                // ReqRes login expects: email + password (password optional for unsuccessful scenario)
-                String email = creds.getOrDefault("email", creds.getOrDefault("Email", ""));
-                String password = creds.getOrDefault("password", creds.getOrDefault("Password", null));
+        @Given("I login unsuccessfully with the following data")
+        public void iLoginWithFollowingData(DataTable dt) {
+                // Feature format:
+                // | Email | Password |
+                // | ...   | ...      |
+                Map<String, String> creds = singleRowTableToMap(dt);
+
+                String email = pickIgnoreCase(creds, "email", "Email");
+                String password = pickIgnoreCase(creds, "password", "Password"); // may be "" (missing)
+
+                // If empty string, send null to trigger missing-password stub
+                if (password != null && password.trim().isEmpty()) {
+                        password = null;
+                }
 
                 Response resp = client.login(email, password);
                 ctx.set(LAST_RESPONSE, resp);
         }
 
+        @Then("^I should get a response code of (\\d+)$")
+        public void iShouldGetAResponseCodeOf(int responseCode) {
+                Response resp = (Response) ctx.get(LAST_RESPONSE);
+                assertNotNull(resp, "No response found in context");
+
+                assertEquals(
+                        resp.getStatusCode(),
+                        responseCode,
+                        "Unexpected status code. Body: " + resp.getBody().asString()
+                );
+        }
+
+        @And("^I should see the following response message:$")
+        public void iShouldSeeTheFollowingResponseMessage(DataTable dt) {
+                Response resp = (Response) ctx.get(LAST_RESPONSE);
+                assertNotNull(resp, "No response found in context");
+
+                // Your feature currently uses:
+                // | "error": "Missing password" |
+                // That is a 1-cell row. We'll just assert the body contains that snippet.
+                List<List<String>> rows = dt.asLists(String.class);
+                assertFalse(rows.isEmpty(), "Expected at least one row in response message table");
+
+                String expectedSnippet = rows.get(0).get(0).trim();
+                String body = resp.getBody().asString();
+
+                assertTrue(body.contains(expectedSnippet.replace("\"", "")) || body.contains(expectedSnippet),
+                        "Expected response body to contain: " + expectedSnippet + " Body: " + body);
+        }
+
+        // -------------------------
+        // DELAYED USERS
+        // -------------------------
+
         @Given("^I wait for the user list to load$")
         public void iWaitForUserListToLoad() {
-                // ReqRes delayed endpoint: /api/users?delay=3
                 Response resp = client.listUsersDelayed(3);
                 ctx.set(LAST_RESPONSE, resp);
-                assertEquals(resp.getStatusCode(), 200, "Expected 200 for delayed users");
+
+                assertEquals(
+                        resp.getStatusCode(),
+                        200,
+                        "Expected 200 for delayed users. Body: " + resp.getBody().asString()
+                );
         }
 
         @Then("I should see that every user has a unique id")
         public void iShouldSeeThatEveryUserHasAUniqueID() {
                 Response resp = (Response) ctx.get(LAST_RESPONSE);
                 assertNotNull(resp, "No response found in context");
-                assertEquals(resp.getStatusCode(), 200, "Expected 200 response");
+
+                assertEquals(resp.getStatusCode(), 200, "Expected 200 response. Body: " + resp.getBody().asString());
 
                 List<Integer> ids = resp.jsonPath().getList("data.id");
                 assertNotNull(ids, "No user ids found in response");
@@ -163,51 +239,51 @@ public class ApiSteps {
                 assertEquals(unique.size(), ids.size(), "User IDs are not unique");
         }
 
-        @Then("^I should get a response code of (\\d+)$")
-        public void iShouldGetAResponseCodeOf(int responseCode) {
-                Response resp = (Response) ctx.get(LAST_RESPONSE);
-                assertNotNull(resp, "No response found in context");
-                assertEquals(resp.getStatusCode(), responseCode, "Unexpected status code");
-        }
-
-        @And("^I should see the following response message:$")
-        public void iShouldSeeTheFollowingResponseMessage(DataTable dt) {
-                Response resp = (Response) ctx.get(LAST_RESPONSE);
-                assertNotNull(resp, "No response found in context");
-
-                Map<String, String> expected = dataTableToMap(dt);
-
-                // Most common ReqRes error field is "error"
-                expected.forEach((k, v) -> {
-                        String actual = String.valueOf(resp.jsonPath().get(k));
-                        assertEquals(actual, v, "Mismatch for response field: " + k);
-                });
-        }
-
         // -------------------------
         // Helpers
         // -------------------------
-        private Map<String, String> dataTableToMap(DataTable dt) {
-                // Supports either:
-                // | key | value |
-                // or:
-                // | key | value | (as header)
+
+        private static Map<String, String> singleRowTableToMap(DataTable dt) {
+                // Supports BOTH:
+                // 1) header + one row:  | col1 | col2 | ... |
+                //                       | v1   | v2   | ... |
+                // 2) key/value rows:    | key | value |
+                //                       | ... | ...   |
                 List<List<String>> raw = dt.asLists(String.class);
                 if (raw.isEmpty()) return Collections.emptyMap();
 
-                // If first row looks like headers: ["key","value"]
-                boolean hasHeader = raw.get(0).size() >= 2 &&
-                        raw.get(0).get(0).toLowerCase().contains("key");
+                // header + one row
+                if (raw.size() >= 2 && raw.get(0).size() >= 2 && raw.get(1).size() == raw.get(0).size()) {
+                        Map<String, String> map = new LinkedHashMap<>();
+                        List<String> headers = raw.get(0);
+                        List<String> values = raw.get(1);
+                        for (int i = 0; i < headers.size(); i++) {
+                                map.put(headers.get(i).trim(), values.get(i) == null ? null : values.get(i).trim());
+                        }
+                        return map;
+                }
 
-                int start = hasHeader ? 1 : 0;
-
+                // key/value rows
                 Map<String, String> map = new LinkedHashMap<>();
-                for (int i = start; i < raw.size(); i++) {
-                        List<String> row = raw.get(i);
+                for (List<String> row : raw) {
                         if (row.size() >= 2) {
-                                map.put(row.get(0).trim(), row.get(1).trim());
+                                String k = row.get(0) == null ? null : row.get(0).trim();
+                                String v = row.get(1) == null ? null : row.get(1).trim();
+                                if (k != null && !k.isEmpty()) map.put(k, v);
                         }
                 }
                 return map;
+        }
+
+        private static String pickIgnoreCase(Map<String, String> map, String... keys) {
+                for (String k : keys) {
+                        if (map.containsKey(k)) return map.get(k);
+                        for (String actualKey : map.keySet()) {
+                                if (actualKey != null && actualKey.equalsIgnoreCase(k)) {
+                                        return map.get(actualKey);
+                                }
+                        }
+                }
+                return null;
         }
 }

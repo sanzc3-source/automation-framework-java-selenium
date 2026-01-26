@@ -1,3 +1,4 @@
+@api
 Feature: API test
 # Please visit https://reqres.in/
 

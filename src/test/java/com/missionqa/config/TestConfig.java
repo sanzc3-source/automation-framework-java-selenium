@@ -21,6 +21,13 @@ public final class TestConfig {
     private TestConfig() {}
 
     public static String getProperty(String key) {
+        // 1) allow override via -Dkey=value
+        String sys = System.getProperty(key);
+        if (sys != null && !sys.trim().isEmpty()) {
+            return sys.trim();
+        }
+
+        // 2) fallback to config.properties
         String val = props.getProperty(key);
         if (val == null) {
             throw new IllegalArgumentException("Missing config key in config.properties: " + key);
@@ -28,7 +35,7 @@ public final class TestConfig {
         return val.trim();
     }
 
-    // Optional convenience helpers (safe)
+    // Optional convenience helpers
     public static String uiBaseUrl() { return getProperty("ui.baseUrl"); }
     public static String browser() { return getProperty("browser"); }
     public static String screenshotDir() { return getProperty("screenshot.dir"); }

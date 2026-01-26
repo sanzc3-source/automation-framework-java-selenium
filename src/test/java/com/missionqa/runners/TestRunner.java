@@ -15,7 +15,7 @@ import io.cucumber.testng.CucumberOptions;
                 "html:target/cucumber-reports.html",
                 "json:target/cucumber.json"
         },
-        tags = "@ui"
+        tags = "@ui or @api"
 )
 public class TestRunner extends AbstractTestNGCucumberTests {
 }
