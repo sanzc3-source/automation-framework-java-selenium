@@ -3,18 +3,16 @@ package com.missionqa.hooks;
 import com.missionqa.config.TestConfig;
 import com.missionqa.core.DriverManager;
 import com.missionqa.core.DriverProvider;
-import cucumber.api.Scenario;
-import cucumber.api.java.After;
-import cucumber.api.java.Before;
+import io.cucumber.java.After;
+import io.cucumber.java.Before;
+import io.cucumber.java.Scenario;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 
 import java.io.File;
-import java.sql.Timestamp;
-import java.util.Date;
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 
 public class Hook {
 
@@ -27,9 +25,10 @@ public class Hook {
 
         driver.manage().deleteAllCookies();
         driver.manage().window().maximize();
-        driver.manage().timeouts().pageLoadTimeout(WAIT_SEC, TimeUnit.SECONDS);
-        driver.manage().timeouts().implicitlyWait(WAIT_SEC, TimeUnit.SECONDS);
-        driver.manage().timeouts().setScriptTimeout(WAIT_SEC, TimeUnit.SECONDS);
+
+        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(WAIT_SEC));
+        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(WAIT_SEC));
+        // driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(WAIT_SEC)); // remove for baseline stability
 
         driver.get(TestConfig.getProperty("ui.baseUrl"));
     }
@@ -41,18 +40,19 @@ public class Hook {
             driver = DriverProvider.get();
         } catch (Exception ignored) {}
 
-        // Screenshot only on failure
         if (driver != null && scenario != null && scenario.isFailed()) {
             try {
                 String browser = TestConfig.getProperty("browser");
                 String screenshotDir = TestConfig.getProperty("screenshot.dir");
 
-                String fileName = scenario.getName().replace(" ", "")
-                        + new Timestamp(new Date().getTime()).toString().replaceAll("[^a-zA-Z0-9]", "")
-                        + "_" + browser + ".png";
+                File dir = new File(screenshotDir);
+                if (!dir.exists()) dir.mkdirs();
+
+                String safeName = scenario.getName().replaceAll("[^a-zA-Z0-9-_]", "_");
+                String fileName = safeName + "_" + browser + "_" + System.currentTimeMillis() + ".png";
 
                 File src = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
-                FileUtils.copyFile(src, new File(screenshotDir + File.separator + fileName));
+                FileUtils.copyFile(src, new File(dir, fileName));
             } catch (Exception ignored) {}
         }
 
@@ -62,11 +62,11 @@ public class Hook {
 
     @Before("@api")
     public void beforeApi() {
-        // API setup lives here later (tokens, headers, etc.)
+        // API setup later if needed
     }
 
     @After("@api")
     public void afterApi() {
-        // API cleanup if needed later
+        // API cleanup later if needed
     }
 }

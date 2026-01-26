@@ -166,24 +166,30 @@ UI and API step definitions were implemented together in a single
 
 ---
 
-### Issue 7 – Duplicate Step Definition Method Names
-**Type:** Code Quality  
-**Risk:** Low
+### Issue 7 – Duplicate Cucumber Step Definitions
 
-**Evidence:**  
-Two step definition methods shared the same method name but differed only by parameter type.
+Type: Automation / BDD Configuration
+**Risk:** Medium
+
+**Evidence:**
+Cucumber failed at runtime with a DuplicateStepDefinitionException due to multiple step annotations (@Given and @When) mapped to the same step text:
+"I add these items to the cart {string}"
 
 **Impact:**
-- Reduced readability
-- Increased cognitive load during debugging
-- Risky for future refactoring
+- Entire UI test suite failed before execution
+- Blocked scenario execution and CI feedback
+- Produced misleading “undefined step” errors
+- Increased debugging time and reduced framework reliability
 
 **Fix:**
-- Renamed step definition methods to be intention-revealing
-- Ensured all step methods have unique, descriptive names
+- Standardized the step definition to use a single keyword (@When)
+- Updated all feature files to consistently use the same step wording
+- Removed redundant step annotations to enforce one-to-one step mapping
 
 **Verification:**
-- Code compiles cleanly
-- Step definitions are unambiguous and easy to maintain
+- mvn clean test executes successfully
+- All UI scenarios pass consistently
+- No duplicate or undefined step warnings
+- Step definitions are deterministic and easy to maintain
 
 ---

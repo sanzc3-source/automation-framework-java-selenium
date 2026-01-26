@@ -2,11 +2,13 @@ package com.missionqa.api.steps;
 
 import com.missionqa.api.client.ReqResClient;
 import com.missionqa.core.TestContext;
-import cucumber.api.DataTable;
-import cucumber.api.java.en.And;
-import cucumber.api.java.en.Given;
-import cucumber.api.java.en.Then;
-import cucumber.api.java.en.When;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.When;
+import io.cucumber.java.en.Then;
+import io.cucumber.java.en.And;
+import io.cucumber.java.Scenario;
+
 import io.restassured.response.Response;
 
 import java.util.*;
@@ -190,7 +192,7 @@ public class ApiSteps {
                 // | key | value |
                 // or:
                 // | key | value | (as header)
-                List<List<String>> raw = dt.raw();
+                List<List<String>> raw = dt.asLists(String.class);
                 if (raw.isEmpty()) return Collections.emptyMap();
 
                 // If first row looks like headers: ["key","value"]

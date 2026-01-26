@@ -145,8 +145,7 @@
                 <version>3.5.2</version>
                 <configuration>
                     <includes>
-                        <include>**/*Test.java</include>
-                        <include>**/*Runner.java</include>
+                        <include>**/TestRunner.java</include>
                     </includes>
                 </configuration>
             </plugin>

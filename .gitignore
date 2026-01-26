@@ -7,3 +7,7 @@ test-output/
 # IntelliJ (optional - recommended)
 .idea/
 *.iml
+
+# macOS junk
+.DS_Store
+

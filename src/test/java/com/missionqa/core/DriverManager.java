@@ -8,6 +8,9 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.firefox.FirefoxDriver;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public final class DriverManager {
 
     private DriverManager() {}
@@ -18,7 +21,11 @@ public final class DriverManager {
         switch (browser) {
             case "chrome":
                 WebDriverManager.chromedriver().setup();
-                return new ChromeDriver();
+                return new ChromeDriver(buildChromeOptions(false));
+
+            case "chromeheadless":
+                WebDriverManager.chromedriver().setup();
+                return new ChromeDriver(buildChromeOptions(true));
 
             case "edge":
                 WebDriverManager.edgedriver().setup();
@@ -28,15 +35,43 @@ public final class DriverManager {
                 WebDriverManager.firefoxdriver().setup();
                 return new FirefoxDriver();
 
-            case "chromeheadless":
-                WebDriverManager.chromedriver().setup();
-                ChromeOptions opts = new ChromeOptions();
-                opts.addArguments("--headless=new");
-                return new ChromeDriver(opts);
-
             default:
                 throw new IllegalArgumentException("Unsupported browser in config.properties: " + browser);
         }
+    }
+
+    private static ChromeOptions buildChromeOptions(boolean headless) {
+        ChromeOptions options = new ChromeOptions();
+
+        if (headless) {
+            options.addArguments("--headless=new");
+        }
+
+        // Fresh profile each run
+        String tmpProfile = System.getProperty("java.io.tmpdir")
+                + "/missionqa-chrome-" + System.currentTimeMillis();
+        options.addArguments("--user-data-dir=" + tmpProfile);
+
+        // Reduce Chrome UI noise
+        options.addArguments("--no-first-run");
+        options.addArguments("--no-default-browser-check");
+        options.addArguments("--disable-notifications");
+        options.addArguments("--disable-popup-blocking");
+        options.addArguments("--disable-extensions");
+        options.addArguments("--disable-gpu");
+        options.addArguments("--disable-dev-shm-usage");
+
+        // KEY: disable password leak detection popup
+        options.addArguments("--disable-features=PasswordLeakDetection");
+
+        // Disable password manager + credential prompts + leak detection
+        Map<String, Object> prefs = new HashMap<>();
+        prefs.put("credentials_enable_service", false);
+        prefs.put("profile.password_manager_enabled", false);
+        prefs.put("profile.password_manager_leak_detection", false); // <- important
+        options.setExperimentalOption("prefs", prefs);
+
+        return options;
     }
 
     public static void quitDriver(WebDriver driver) {

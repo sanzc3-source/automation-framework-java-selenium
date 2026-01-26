@@ -11,21 +11,17 @@ Feature: SauceDemo checkout calculations
 
   @cart
   Scenario Outline: Add items shows correct cart badge count
-    When I add these items to the cart
-      | item |
-      <items>
+    When I add these items to the cart "<items>"
     Then the cart badge count should be <count>
 
     Examples:
-      | items                                                                                           | count |
-      | Sauce Labs Backpack\nSauce Labs Fleece Jacket\nSauce Labs Bolt T-Shirt\nSauce Labs Onesie       | 4     |
-      | Sauce Labs Backpack\nSauce Labs Onesie                                                          | 2     |
+      | items                                                                                     | count |
+      | Sauce Labs Backpack\nSauce Labs Fleece Jacket\nSauce Labs Bolt T-Shirt\nSauce Labs Onesie | 4     |
+      | Sauce Labs Backpack\nSauce Labs Onesie                                                    | 2     |
 
   @cart
   Scenario Outline: Remove item reduces cart badge count
-    Given I add these items to the cart
-      | item |
-      <items>
+    When I add these items to the cart "<items>"
     And the cart badge count should be <before>
     When I open the cart
     And I remove item "<removeItem>"
@@ -37,9 +33,7 @@ Feature: SauceDemo checkout calculations
 
   @checkout
   Scenario Outline: Checkout totals and tax are correct
-    Given I add these items to the cart
-      | item |
-      <items>
+    When I add these items to the cart "<items>"
     When I open the cart
     And I proceed to checkout
     And I enter checkout info first "<first>" last "<last>" zip "<zip>"
