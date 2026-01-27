@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    triggers {
+        cron('* * * * *')
+    }
+
     parameters {
         string(name: 'TAGS', defaultValue: '@ui or @api', description: 'Cucumber tag expression (ex: @ui, @api, @smoke, @regression, @ui and not @wip)')
     }
