@@ -1,9 +1,10 @@
 services:
   selenium:
-    image: selenium/standalone-chrome:latest
+    image: ${SELENIUM_IMAGE:-selenium/standalone-chrome:latest}
     shm_size: "2gb"
-    ports:
-      - "4444:4444"
+    # No host port mapping needed in CI (prevents 4444 conflicts)
+    # ports:
+    #   - "4444:4444"
 
   missionqa:
     build: .
@@ -11,7 +12,7 @@ services:
       - selenium
     environment:
       TAGS: ${TAGS:-}
-      BROWSER: chromeheadless
+      BROWSER: ${BROWSER:-chromeheadless}
       SELENIUM_REMOTE_URL: http://selenium:4444/wd/hub
     volumes:
       - ./artifacts:/app/artifacts

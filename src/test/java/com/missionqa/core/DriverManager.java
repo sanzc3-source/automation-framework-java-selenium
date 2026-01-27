@@ -23,7 +23,15 @@ public final class DriverManager {
     private DriverManager() {}
 
     public static WebDriver createDriver() {
-        String browser = TestConfig.getProperty("browser").toLowerCase();
+        String browser = System.getenv("BROWSER");
+        if (browser == null || browser.isBlank()) {
+            browser = System.getProperty("browser");
+        }
+        if (browser == null || browser.isBlank()) {
+            browser = TestConfig.getProperty("browser");
+        }
+        browser = browser.toLowerCase();
+
         String remoteUrl = System.getenv("SELENIUM_REMOTE_URL");
 
         // If running in Docker with Selenium container, use RemoteWebDriver
@@ -43,11 +51,15 @@ public final class DriverManager {
 
             case "edge":
                 setupIfNeeded("edge");
-                return new EdgeDriver();
+                return new EdgeDriver(new EdgeOptions());
 
             case "firefox":
                 setupIfNeeded("firefox");
-                return new FirefoxDriver();
+                return new FirefoxDriver(buildFirefoxOptions(false));
+
+            case "firefoxheadless":
+                setupIfNeeded("firefox");
+                return new FirefoxDriver(buildFirefoxOptions(true));
 
             default:
                 throw new IllegalArgumentException("Unsupported browser in config.properties: " + browser);
@@ -61,14 +73,16 @@ public final class DriverManager {
             switch (browser) {
                 case "chrome":
                 case "chromeheadless":
-                    boolean headless = browser.equals("chromeheadless");
-                    return new RemoteWebDriver(gridUrl, buildChromeOptions(headless));
+                    boolean chromeHeadless = browser.equals("chromeheadless");
+                    return new RemoteWebDriver(gridUrl, buildChromeOptions(chromeHeadless));
 
                 case "edge":
                     return new RemoteWebDriver(gridUrl, new EdgeOptions());
 
                 case "firefox":
-                    return new RemoteWebDriver(gridUrl, new FirefoxOptions());
+                case "firefoxheadless":
+                    boolean ffHeadless = browser.equals("firefoxheadless");
+                    return new RemoteWebDriver(gridUrl, buildFirefoxOptions(ffHeadless));
 
                 default:
                     throw new IllegalArgumentException("Unsupported browser in config.properties: " + browser);
@@ -132,6 +146,14 @@ public final class DriverManager {
         prefs.put("profile.password_manager_leak_detection", false);
         options.setExperimentalOption("prefs", prefs);
 
+        return options;
+    }
+
+    private static FirefoxOptions buildFirefoxOptions(boolean headless) {
+        FirefoxOptions options = new FirefoxOptions();
+        if (headless) {
+            options.addArguments("-headless");
+        }
         return options;
     }
 
