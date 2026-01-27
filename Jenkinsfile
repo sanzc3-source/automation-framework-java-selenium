@@ -18,6 +18,9 @@ pipeline {
                   docker compose down || true
                   docker compose build
                   TAGS="${TAGS}" docker compose up --abort-on-container-exit
+
+                  echo "=== DEBUG: artifacts directory ==="
+                  ls -lah artifacts || true
                 '''
             }
         }
