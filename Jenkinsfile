@@ -28,6 +28,12 @@ pipeline {
 
     post {
         always {
+            // ✅ Publish cucumber.json as "Cucumber Test Result"
+            cucumber(
+                fileIncludePattern: 'artifacts/cucumber.json'
+            )
+
+            // ✅ Keep your existing HTML link too
             publishHTML([
                 reportName: 'Cucumber HTML Report',
                 reportDir: 'artifacts',
