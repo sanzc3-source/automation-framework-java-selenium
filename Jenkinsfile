@@ -13,28 +13,27 @@ pipeline {
     parameters {
         choice(
             name: 'RUN_MODE',
-            choices: ['UI_REGRESSION', 'API_REGRESSION', 'CUSTOM', 'ALL'],
-            description: 'UI_REGRESSION=@ui and @regression (chrome+firefox nightly; manual uses BROWSERS). ' +
-                         'API_REGRESSION=@api and @regression (once). ' +
-                         'CUSTOM=run TAGS (must be UI-only OR API-only). ' +
-                         'ALL=run UI (@ui) + API (@api).'
+            choices: ['ALL', 'CUSTOM', 'UI_REGRESSION', 'API_REGRESSION'],
+            description: 'ALL=@ui or @api. CUSTOM=use TAGS. UI_REGRESSION=@ui and @regression (chrome+firefox). API_REGRESSION=@api and @regression (once).'
         )
         string(
             name: 'TAGS',
-            defaultValue: '@ui and @regression',
-            description: 'Only used when RUN_MODE=CUSTOM. Must be UI-only (contains @ui) OR API-only (contains @api).'
+            defaultValue: '@ui or @api',
+            description: 'Used when RUN_MODE=CUSTOM'
         )
         choice(
             name: 'BROWSERS',
-            choices: ['both', 'chrome', 'firefox'],
-            description: 'Used for UI runs (UI_REGRESSION or CUSTOM UI-only). API ignores this.'
+            choices: ['chrome', 'firefox', 'both'],
+            description: 'Used for UI runs (CUSTOM/UI_REGRESSION). API ignores this.'
         )
     }
 
     stages {
 
         stage('Checkout') {
-            steps { checkout scm }
+            steps {
+                checkout scm
+            }
         }
 
         stage('Prep Workspace (clean artifacts)') {
@@ -54,53 +53,97 @@ pipeline {
                 sh '''
                   set -e
 
+                  label_json() {
+                    FILE="$1"
+                    LABEL="$2"
+                    if [ -f "$FILE" ]; then
+                      python3 - <<'PY' "$FILE" "$LABEL"
+import json, sys
+path = sys.argv[1]
+label = sys.argv[2]
+with open(path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+# Cucumber JSON is typically a list of "feature" objects with "name"
+if isinstance(data, list):
+    for feat in data:
+        if isinstance(feat, dict) and "name" in feat and isinstance(feat["name"], str):
+            feat["name"] = f"{feat['name']} [{label}]"
+
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False)
+PY
+                    fi
+                  }
+
                   run_once() {
-                    SUFFIX="$1"; TAGS="$2"; SELENIUM_IMAGE="$3"; BROWSER="$4"
+                    SUFFIX="$1"; TAGS="$2"; SELENIUM_IMAGE="$3"; BROWSER="$4"; LABEL="$5"
 
                     export COMPOSE_PROJECT_NAME="missionqa-${BUILD_NUMBER}-${SUFFIX}"
 
-                    # Clean any leftovers for this compose project
                     docker compose -p "$COMPOSE_PROJECT_NAME" down -v --remove-orphans || true
-
-                    # Clean runner outputs (compose mounts ./artifacts -> /app/artifacts)
-                    rm -f artifacts/cucumber.html artifacts/cucumber.json || true
 
                     docker compose -p "$COMPOSE_PROJECT_NAME" build
 
                     TAGS="$TAGS" BROWSER="$BROWSER" SELENIUM_IMAGE="$SELENIUM_IMAGE" \
                       docker compose -p "$COMPOSE_PROJECT_NAME" up --abort-on-container-exit
 
-                    # Standardized output folders (always same names)
                     mkdir -p "artifacts/$SUFFIX"
-                    mv artifacts/cucumber.html "artifacts/$SUFFIX/cucumber.html" || true
-                    mv artifacts/cucumber.json "artifacts/$SUFFIX/cucumber.json" || true
+
+                    # Move report files into per-run folder
+                    if [ -f artifacts/cucumber.html ]; then
+                      mv artifacts/cucumber.html "artifacts/$SUFFIX/cucumber.html"
+                    fi
+                    if [ -f artifacts/cucumber.json ]; then
+                      mv artifacts/cucumber.json "artifacts/$SUFFIX/cucumber.json"
+                      label_json "artifacts/$SUFFIX/cucumber.json" "$LABEL"
+                    fi
 
                     docker compose -p "$COMPOSE_PROJECT_NAME" down -v --remove-orphans || true
                   }
 
-                  # API regression once
-                  run_once "api" "@api and @regression" "selenium/standalone-chrome:latest" "chromeheadless"
+                  # 1) API regression once
+                  run_once "api" "@api and @regression" "selenium/standalone-chrome:latest" "chromeheadless" "API"
 
-                  # UI regression both browsers
-                  run_once "ui-chrome"  "@ui and @regression" "selenium/standalone-chrome:latest"  "chromeheadless"
-                  run_once "ui-firefox" "@ui and @regression" "selenium/standalone-firefox:latest" "firefoxheadless"
+                  # 2) UI regression chrome + firefox
+                  run_once "ui-chrome" "@ui and @regression" "selenium/standalone-chrome:latest" "chromeheadless" "UI Chrome"
+                  run_once "ui-firefox" "@ui and @regression" "selenium/standalone-firefox:latest" "firefoxheadless" "UI Firefox"
                 '''
             }
         }
 
-        stage('Manual (Build with Parameters)') {
+        stage('Manual') {
             when { not { triggeredBy 'TimerTrigger' } }
             steps {
                 sh '''
                   set -e
 
+                  label_json() {
+                    FILE="$1"
+                    LABEL="$2"
+                    if [ -f "$FILE" ]; then
+                      python3 - <<'PY' "$FILE" "$LABEL"
+import json, sys
+path = sys.argv[1]
+label = sys.argv[2]
+with open(path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+if isinstance(data, list):
+    for feat in data:
+        if isinstance(feat, dict) and "name" in feat and isinstance(feat["name"], str):
+            feat["name"] = f"{feat['name']} [{label}]"
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False)
+PY
+                    fi
+                  }
+
                   run_once() {
-                    SUFFIX="$1"; TAGS="$2"; SELENIUM_IMAGE="$3"; BROWSER="$4"
+                    SUFFIX="$1"; TAGS="$2"; SELENIUM_IMAGE="$3"; BROWSER="$4"; LABEL="$5"
 
                     export COMPOSE_PROJECT_NAME="missionqa-${BUILD_NUMBER}-${SUFFIX}"
 
                     docker compose -p "$COMPOSE_PROJECT_NAME" down -v --remove-orphans || true
-                    rm -f artifacts/cucumber.html artifacts/cucumber.json || true
 
                     docker compose -p "$COMPOSE_PROJECT_NAME" build
 
@@ -108,80 +151,44 @@ pipeline {
                       docker compose -p "$COMPOSE_PROJECT_NAME" up --abort-on-container-exit
 
                     mkdir -p "artifacts/$SUFFIX"
-                    mv artifacts/cucumber.html "artifacts/$SUFFIX/cucumber.html" || true
-                    mv artifacts/cucumber.json "artifacts/$SUFFIX/cucumber.json" || true
+
+                    if [ -f artifacts/cucumber.html ]; then
+                      mv artifacts/cucumber.html "artifacts/$SUFFIX/cucumber.html"
+                    fi
+                    if [ -f artifacts/cucumber.json ]; then
+                      mv artifacts/cucumber.json "artifacts/$SUFFIX/cucumber.json"
+                      label_json "artifacts/$SUFFIX/cucumber.json" "$LABEL"
+                    fi
 
                     docker compose -p "$COMPOSE_PROJECT_NAME" down -v --remove-orphans || true
                   }
 
                   MODE="${RUN_MODE}"
-
-                  # ---- Decide what to run ----
-                  if [ "$MODE" = "UI_REGRESSION" ]; then
-                    UI_TAGS='@ui and @regression'
-                    if [ "${BROWSERS}" = "both" ]; then
-                      run_once "ui-chrome"  "$UI_TAGS" "selenium/standalone-chrome:latest"  "chromeheadless"
-                      run_once "ui-firefox" "$UI_TAGS" "selenium/standalone-firefox:latest" "firefoxheadless"
-                    elif [ "${BROWSERS}" = "firefox" ]; then
-                      run_once "ui-firefox" "$UI_TAGS" "selenium/standalone-firefox:latest" "firefoxheadless"
-                    else
-                      run_once "ui-chrome" "$UI_TAGS" "selenium/standalone-chrome:latest" "chromeheadless"
-                    fi
-                    exit 0
-                  fi
-
-                  if [ "$MODE" = "API_REGRESSION" ]; then
-                    run_once "api" "@api and @regression" "selenium/standalone-chrome:latest" "chromeheadless"
-                    exit 0
-                  fi
-
-                  if [ "$MODE" = "ALL" ]; then
-                    # Run UI (@ui) and API (@api) as two separate runs (clean separation, clean reports)
-                    if [ "${BROWSERS}" = "both" ]; then
-                      run_once "ui-chrome"  "@ui" "selenium/standalone-chrome:latest"  "chromeheadless"
-                      run_once "ui-firefox" "@ui" "selenium/standalone-firefox:latest" "firefoxheadless"
-                    elif [ "${BROWSERS}" = "firefox" ]; then
-                      run_once "ui-firefox" "@ui" "selenium/standalone-firefox:latest" "firefoxheadless"
-                    else
-                      run_once "ui-chrome" "@ui" "selenium/standalone-chrome:latest" "chromeheadless"
-                    fi
-
-                    run_once "api" "@api" "selenium/standalone-chrome:latest" "chromeheadless"
-                    exit 0
-                  fi
-
-                  # CUSTOM mode: must be UI-only OR API-only (no mixed expressions)
                   TAG_EXPR="${TAGS}"
 
-                  HAS_UI=false
-                  HAS_API=false
-                  echo "$TAG_EXPR" | grep -q '@ui'  && HAS_UI=true || true
-                  echo "$TAG_EXPR" | grep -q '@api' && HAS_API=true || true
-
-                  if [ "$HAS_UI" = "true" ] && [ "$HAS_API" = "true" ]; then
-                    echo "ERROR: CUSTOM TAGS cannot include both @ui and @api. Use RUN_MODE=ALL instead."
-                    exit 2
+                  if [ "$MODE" = "ALL" ]; then
+                    TAG_EXPR='@ui or @api'
+                  elif [ "$MODE" = "UI_REGRESSION" ]; then
+                    TAG_EXPR='@ui and @regression'
+                  elif [ "$MODE" = "API_REGRESSION" ]; then
+                    TAG_EXPR='@api and @regression'
                   fi
 
-                  if [ "$HAS_API" = "true" ]; then
-                    run_once "api" "$TAG_EXPR" "selenium/standalone-chrome:latest" "chromeheadless"
+                  # If API-only expression (no @ui)
+                  if echo "$TAG_EXPR" | grep -q '@api' && ! echo "$TAG_EXPR" | grep -q '@ui'; then
+                    run_once "manual-api" "$TAG_EXPR" "selenium/standalone-chrome:latest" "chromeheadless" "API"
                     exit 0
                   fi
 
-                  if [ "$HAS_UI" = "true" ]; then
-                    if [ "${BROWSERS}" = "both" ]; then
-                      run_once "ui-chrome"  "$TAG_EXPR" "selenium/standalone-chrome:latest"  "chromeheadless"
-                      run_once "ui-firefox" "$TAG_EXPR" "selenium/standalone-firefox:latest" "firefoxheadless"
-                    elif [ "${BROWSERS}" = "firefox" ]; then
-                      run_once "ui-firefox" "$TAG_EXPR" "selenium/standalone-firefox:latest" "firefoxheadless"
-                    else
-                      run_once "ui-chrome" "$TAG_EXPR" "selenium/standalone-chrome:latest" "chromeheadless"
-                    fi
-                    exit 0
+                  # UI runs
+                  if [ "${BROWSERS}" = "both" ]; then
+                    run_once "manual-ui-chrome" "$TAG_EXPR" "selenium/standalone-chrome:latest" "chromeheadless" "UI Chrome"
+                    run_once "manual-ui-firefox" "$TAG_EXPR" "selenium/standalone-firefox:latest" "firefoxheadless" "UI Firefox"
+                  elif [ "${BROWSERS}" = "firefox" ]; then
+                    run_once "manual-ui-firefox" "$TAG_EXPR" "selenium/standalone-firefox:latest" "firefoxheadless" "UI Firefox"
+                  else
+                    run_once "manual-ui-chrome" "$TAG_EXPR" "selenium/standalone-chrome:latest" "chromeheadless" "UI Chrome"
                   fi
-
-                  echo "ERROR: CUSTOM TAGS must include @ui or @api."
-                  exit 3
                 '''
             }
         }
@@ -191,13 +198,14 @@ pipeline {
         always {
             sh 'echo "=== DEBUG artifacts ===" && find artifacts -maxdepth 3 -type f -name "cucumber.*" -print || true'
 
-            // Aggregate JSON files that exist in THIS build only (no leak because we wipe artifacts every build)
+            // Aggregate ALL JSON files across run folders
             cucumber(fileIncludePattern: 'artifacts/**/cucumber.json')
 
-            // Clean, obvious HTML links (only show what exists)
+            // Publish HTML links (allowMissing avoids failures when a suite wasn't run)
             publishHTML([reportName: 'API HTML',        reportDir: 'artifacts/api',        reportFiles: 'cucumber.html', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
             publishHTML([reportName: 'UI Chrome HTML',  reportDir: 'artifacts/ui-chrome',  reportFiles: 'cucumber.html', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
             publishHTML([reportName: 'UI Firefox HTML', reportDir: 'artifacts/ui-firefox', reportFiles: 'cucumber.html', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
+            publishHTML([reportName: 'Manual HTML',     reportDir: 'artifacts',            reportFiles: '**/cucumber.html', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
         }
     }
 }
