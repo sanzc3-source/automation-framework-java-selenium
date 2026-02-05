@@ -1,11 +1,10 @@
-# MissionQA – API & UI Automation Framework
+# Dockerized UI & API Test Automation Framework (Java + Selenium + RestAssured)
 
 **Docker + Jenkins | Java | Cucumber | Selenium**
 
 A **production-grade test automation framework** built using modern QA best practices and designed for local execution using Docker, parameterized Jenkins pipelines, and fully automated nightly regression testing.
 
-This project was originally provided as an assessment and has since been **significantly refactored and extended** to demonstrate real-world automation ownership, CI design, and test stability practices.
-
+A continuously improved automation framework showcasing end-to-end test ownership: architecture, execution, stability hardening, and CI reporting.
 ---
 
 ## 🔧 Tech Stack
@@ -245,4 +244,4 @@ This framework is **stable and production-ready** for:
 
 If you clone this repo and follow the steps above, you should be able to run **any subset of tests in under 5 minutes**.
 
-Happy testing! 🚀
+Happy testing! 
