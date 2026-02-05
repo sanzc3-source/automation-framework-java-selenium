@@ -4,7 +4,7 @@
 
 A **production-grade test automation framework** built using modern QA best practices and designed for local execution using Docker, parameterized Jenkins pipelines, and fully automated nightly regression testing.
 
-"---
+---
 
 ## 🔧 Tech Stack
 
