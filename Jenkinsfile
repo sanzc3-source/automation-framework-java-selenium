@@ -1,9 +1,7 @@
 pipeline {
     agent any
 
-    triggers {
-        cron('0 8 * * *')  // 8:00 AM daily
-    }
+    // Nightly cron trigger removed (demo only)
 
     options {
         timestamps()
@@ -220,7 +218,7 @@ PY
                     run_once "manual-ui-chrome" "$TAG_EXPR" "selenium/standalone-chrome:latest" "chromeheadless" "UI Chrome"
                     run_once "manual-ui-firefox" "$TAG_EXPR" "selenium/standalone-firefox:latest" "firefoxheadless" "UI Firefox"
                   elif [ "${BROWSERS}" = "firefox" ]; then
-                    run_once "manual-ui-firefox" "$TAG_EXPR" "selenium/standalone-firefox:latest" "firefoxheadless" "UI Firefox"
+                    run_once "manual-ui-firefox" "$TAG_EXPR" "selenium/standalone-chrome:latest" "firefoxheadless" "UI Firefox"
                   else
                     run_once "manual-ui-chrome" "$TAG_EXPR" "selenium/standalone-chrome:latest" "chromeheadless" "UI Chrome"
                   fi
