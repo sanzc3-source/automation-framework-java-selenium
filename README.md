@@ -6,7 +6,7 @@ A **production-grade test automation framework** built using modern QA best prac
 
 ---
 
-## 🔧 Tech Stack
+##  Tech Stack
 
 - **Java** + Maven
 - **Cucumber** (BDD)
@@ -17,18 +17,18 @@ A **production-grade test automation framework** built using modern QA best prac
 
 ---
 
-## ✨ What This Framework Supports
+##  What This Framework Supports
 
-- ✅ API-only test execution
-- ✅ UI-only test execution
-- ✅ Combined UI + API execution
-- ✅ Multi-browser UI testing (Chrome & Firefox)
-- ✅ Local Docker execution (no local Java/Selenium required)
-- ✅ Fully automated nightly CI regression
+-  API-only test execution
+-  UI-only test execution
+-  Combined UI + API execution
+-  Multi-browser UI testing (Chrome & Firefox)
+-  Local Docker execution (no local Java/Selenium required)
+-  Fully automated nightly CI regression
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 MissionQA
@@ -73,7 +73,7 @@ MissionQA
 
 ---
 
-## 🧪 Test Coverage
+##  Test Coverage
 
 ### API Tests
 
@@ -101,13 +101,13 @@ MissionQA
 
 ---
 
-## 🐳 Running Tests Locally (Docker)
+##  Running Tests Locally (Docker)
 
 ### Prerequisites
 
 - Docker
 - Docker Compose
-- ❌ No local Java or Selenium required
+- No local Java or Selenium required
 
 ### Run All Tests (UI + API)
 
@@ -151,7 +151,7 @@ TAGS="@api and @regression" docker compose up --build
 
 ---
 
-## 📊 Test Reports
+##  Test Reports
 
 After execution, reports are generated under:
 
@@ -169,7 +169,7 @@ artifacts/
 
 ---
 
-## 🤖 Jenkins CI Pipeline
+##  Jenkins CI Pipeline
 
 ### Nightly Execution (12:01 AM)
 
@@ -202,7 +202,7 @@ artifacts/
 
 ---
 
-## 🔍 Why Features Appear Twice in Reports
+##  Why Features Appear Twice in Reports
 
 When UI tests run on multiple browsers, the same feature executes once per browser.
 
@@ -211,13 +211,13 @@ When UI tests run on multiple browsers, the same feature executes once per brows
 - `SauceDemo checkout calculations [UI Firefox]`
 
 This is intentional and provides:
-- ✅ Browser parity visibility
-- ✅ Clear execution separation
-- ✅ Accurate regression tracking
+-  Browser parity visibility
+-  Clear execution separation
+-  Accurate regression tracking
 
 ---
 
-## 🐛 Known Issues
+##  Known Issues
 
 All identified bugs and improvements are documented in:
 
@@ -225,22 +225,22 @@ All identified bugs and improvements are documented in:
 
 ---
 
-## 👤 Author
+##  Author
 
 **Christian Sanchez**  
 Senior QA Automation Engineer / SDET
 
 ---
 
-## ✅ Current Status
+##  Current Status
 
 This framework is **stable and production-ready** for:
 
-- ✅ Local execution via Docker
-- ✅ Multi-browser testing (Chrome & Firefox)
-- ✅ Jenkins nightly execution + Cucumber reporting
-- ✅ Parameterized CI builds
+-  Local execution via Docker
+-  Multi-browser testing (Chrome & Firefox)
+-  Jenkins nightly execution + Cucumber reporting
+-  Parameterized CI builds
 
 If you clone this repo and follow the steps above, you should be able to run **any subset of tests in under 5 minutes**.
 
-Happy testing! 
+
